@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lector de QR - Registro en Google Sheets</title>
+  <!-- Estilos visuales -->
+  <link rel="stylesheet" href="styles.css">
+  <!-- Librería para lectura de códigos QR por cámara -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+
+  <!-- ================================================================= -->
+  <!-- PANTALLA INICIAL DE ACCESO Y VINCULACIÓN (BLOQUEO DE SEGURIDAD)  -->
+  <!-- ================================================================= -->
+  <div id="auth-screen" class="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-icon">🔐</div>
+        <h2>Acceso y Vinculación</h2>
+        <p>Conecta el lector con tu hoja de cálculo de Google Sheets</p>
+      </div>
+
+      <form id="auth-form" class="auth-form">
+        <!-- Campo: URL Exec de Google Apps Script -->
+        <div class="form-group">
+          <label for="auth-url">
+            <span>🌐 URL de Google Apps Script (Web App):</span>
+          </label>
+          <input 
+            type="url" 
+            id="auth-url" 
+            placeholder="https://script.google.com/macros/s/.../exec" 
+            required 
+            autocomplete="off"
+          >
+          <small class="helper-text">La URL debe terminar en <code>/exec</code></small>
+        </div>
+
+        <!-- Campo: Contraseña almacenada en PASSWORD!A1 -->
+        <div class="form-group">
+          <label for="auth-password">
+            <span>🔑 Contraseña de Acceso:</span>
+          </label>
+          <div class="password-input-wrapper">
+            <input 
+              type="password" 
+              id="auth-password" 
+              placeholder="Ingresa la contraseña de la hoja" 
+              required
+            >
+            <button type="button" id="btn-toggle-password" class="btn-toggle-pass" title="Mostrar/Ocultar contraseña">
+              👁️
+            </button>
+          </div>
+          <small class="helper-text">
+            Esta clave se valida con la <strong>hoja "PASSWORD" en la celda A1</strong>.
+          </small>
+        </div>
+
+        <!-- Mensaje de error/estado -->
+        <div id="auth-error-msg" class="auth-alert" style="display: none;"></div>
+
+        <!-- Botón de Conexión -->
+        <button type="submit" id="btn-submit-auth" class="btn btn-primary btn-block btn-lg">
+          <span id="auth-btn-spinner" class="spinner" style="display: none;"></span>
+          <span id="auth-btn-text">🔐 Conectar y Desbloquear</span>
+        </button>
+      </form>
+
+      <!-- Instrucciones de ayuda colapsables -->
+      <details class="auth-guide">
+        <summary>ℹ️ ¿Cómo obtener la URL y la contraseña?</summary>
+        <div class="auth-guide-content">
+          <ol>
+            <li>En tu hoja de Google Sheets, ve a <strong>Extensiones &gt; Apps Script</strong>.</li>
+            <li>Asegúrate de haber pegado el código de <code>CodigoGoogleSheets.gs</code>.</li>
+            <li>Haz clic en <strong>Implementar &gt; Nueva implementación</strong> (Tipo: <em>Aplicación Web</em>, Acceso: <em>Cualquiera</em>).</li>
+            <li>Copia la URL que termina en <code>/exec</code> y pégala arriba.</li>
+            <li>En tu Google Sheet, crea una pestaña llamada <strong>PASSWORD</strong> y escribe tu contraseña en la celda <strong>A1</strong> (por defecto viene configurada como <code>1234</code>).</li>
+          </ol>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- APLICACIÓN PRINCIPAL (SE MUESTRA TRAS AUTENTICARSE)               -->
+  <!-- ================================================================= -->
+  <div id="app-container" class="app-layout" style="display: none;">
+
+    <!-- Barra de navegación superior -->
+    <header class="navbar">
+      <div class="logo-container">
+        <div class="logo-icon">📱</div>
+        <div class="logo-title">
+          <h1>Lector de Códigos QR</h1>
+          <p>Almacenamiento automático en Google Sheets</p>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <div id="connection-status-badge" class="badge-status connected">
+          <span class="badge-dot"></span>
+          <span id="connection-status-text">Conectado</span>
+        </div>
+        <button id="btn-logout" class="btn btn-secondary btn-sm" title="Desvincular o cambiar de hoja">
+          🔒 Desvincular
+        </button>
+      </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="main-container">
+      
+      <!-- Panel Izquierdo: Cámara y Escáner -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">📷 Escáner de Cámara</h2>
+          <button id="btn-manual-input" class="btn btn-secondary btn-sm" title="Ingresar código de forma manual">
+            ✏️ Manual
+          </button>
+        </div>
+        <div class="card-body">
+          
+          <!-- Visor de la Cámara -->
+          <div class="scanner-wrapper">
+            <div id="camera-placeholder" class="camera-placeholder">
+              <i>📷</i>
+              <p>Presiona <strong>Iniciar Escáner</strong> para activar la cámara</p>
+            </div>
+            <div id="reader"></div>
+            <div id="scanner-overlay" class="scanner-overlay"></div>
+          </div>
+
+          <!-- Controles de la Cámara -->
+          <div class="scanner-controls">
+            <select id="camera-select" class="select-camera" aria-label="Seleccionar Cámara">
+              <option value="">Buscando cámaras disponibles...</option>
+            </select>
+
+            <button id="btn-start-scan" class="btn btn-primary btn-block">
+              ▶️ Iniciar Escáner
+            </button>
+            <button id="btn-stop-scan" class="btn btn-danger btn-block" style="display: none;">
+              ⏹️ Detener Escáner
+            </button>
+          </div>
+
+          <!-- Tarjeta del último código detectado -->
+          <div id="last-scan-card" class="last-scan-card" style="display: none;">
+            <div class="last-scan-header">
+              <span>Último QR detectado</span>
+              <span id="last-scan-time">--:--:--</span>
+            </div>
+            <div id="last-scan-data" class="last-scan-value">...</div>
+          </div>
+
+          <!-- Opciones Rápidas -->
+          <div class="scan-options">
+            <div class="option-row">
+              <label for="toggle-audio">Sonido de confirmación (Beep):</label>
+              <input type="checkbox" id="toggle-audio" checked>
+            </div>
+            <div class="option-row">
+              <label for="cooldown-select">Pausa entre lecturas repetidas:</label>
+              <select id="cooldown-select" class="select-camera" style="width: auto; padding: 0.3rem 0.5rem;">
+                <option value="1">1 segundo</option>
+                <option value="3" selected>3 segundos</option>
+                <option value="5">5 segundos</option>
+                <option value="10">10 segundos</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Panel Derecho: Historial de Registros -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">📋 Registros Escaneados</h2>
+          <div class="table-actions">
+            <button id="btn-retry-pending" class="btn btn-secondary btn-sm" title="Reenviar lecturas pendientes a Google Sheets">
+              🔄 Reenviar
+            </button>
+            <button id="btn-export-csv" class="btn btn-secondary btn-sm" title="Descargar como archivo CSV compatible con Excel">
+              📥 Exportar CSV
+            </button>
+            <button id="btn-clear-history" class="btn btn-secondary btn-sm" title="Vaciar tabla local">
+              🗑️ Limpiar
+            </button>
+          </div>
+        </div>
+
+        <!-- Resumen estadístico -->
+        <div class="table-stats">
+          <div class="stat-item">Total lecturas: <span id="total-scans">0</span></div>
+          <div class="stat-item">Pendientes de envío: <span id="pending-scans">0</span></div>
+        </div>
+
+        <!-- Tabla de Lecturas -->
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40px;">#</th>
+                <th>FECHA</th>
+                <th>HORA</th>
+                <th>DATO QR</th>
+                <th>ESTADO</th>
+                <th style="width: 40px;">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody id="records-table-body">
+              <!-- Los registros se cargan dinámicamente mediante JavaScript -->
+            </tbody>
+          </table>
+
+          <!-- Estado vacío si no hay lecturas -->
+          <div id="empty-state" class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+            </svg>
+            <p>Aún no se han escaneado códigos QR.</p>
+            <p style="font-size: 0.8rem; margin-top: 0.35rem;">Apunta un código a la cámara para registrarlo automáticamente.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Modal para Entrada Manual -->
+  <div id="manual-modal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">✏️ Registro Manual de Código</h3>
+        <button id="btn-close-manual" class="btn btn-secondary btn-sm">✕</button>
+      </div>
+      <form id="form-manual">
+        <div class="modal-body">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Útil en caso de que la cámara no enfoque o el código físico esté deteriorado.
+          </p>
+          <label for="input-manual-code" style="font-size: 0.85rem; font-weight: 600;">Dato o Contenido del QR:</label>
+          <input type="text" id="input-manual-code" class="select-camera" style="width: 100%; margin-top: 0.5rem; padding: 0.7rem;" placeholder="Ejemplo: EMP-10492, ASIST-JUAN, etc." required autofocus>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('manual-modal').classList.remove('open')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Registrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Contenedor de notificaciones flotantes -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Lógica JavaScript de la aplicación -->
+  <script src="app.js"></script>
+</body>
+</html>
