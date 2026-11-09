@@ -8,19 +8,59 @@
  * ====================================================================
  */
 
+// Utilidad de almacenamiento a prueba de fallos para navegadores móviles (modo incógnito / WebView)
+const safeStorage = {
+  get(key, fallback = '') {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const val = window.localStorage.getItem(key);
+        return val !== null ? val : fallback;
+      }
+    } catch (e) {
+      console.warn('Acceso a localStorage restringido:', e);
+    }
+    return fallback;
+  },
+  set(key, value) {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+      }
+    } catch (e) {
+      console.warn('No se pudo guardar en localStorage:', e);
+    }
+  },
+  remove(key) {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+      }
+    } catch (e) {}
+  }
+};
+
+function obtenerHistorialInicial() {
+  try {
+    const raw = safeStorage.get('qr_history', '[]');
+    return JSON.parse(raw) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
 // Estado global de la aplicación
 const AppState = {
   html5QrCode: null,
   isScanning: false,
   selectedCameraId: null,
-  googleSheetUrl: localStorage.getItem('qr_sheets_url') || '',
-  password: localStorage.getItem('qr_sheets_password') || '',
-  isAuthenticated: localStorage.getItem('qr_auth_verified') === 'true',
-  audioEnabled: localStorage.getItem('qr_audio_enabled') !== 'false',
-  cooldownSeconds: parseInt(localStorage.getItem('qr_cooldown') || '3', 10),
+  googleSheetUrl: safeStorage.get('qr_sheets_url', ''),
+  password: safeStorage.get('qr_sheets_password', ''),
+  isAuthenticated: safeStorage.get('qr_auth_verified', '') === 'true',
+  audioEnabled: safeStorage.get('qr_audio_enabled', 'true') !== 'false',
+  cooldownSeconds: parseInt(safeStorage.get('qr_cooldown', '3'), 10),
   lastScannedText: '',
   lastScannedTime: 0,
-  history: JSON.parse(localStorage.getItem('qr_history') || '[]'),
+  history: obtenerHistorialInicial(),
   nativeDetectorActive: false,
   nativeVideoTrack: null
 };
@@ -28,48 +68,52 @@ const AppState = {
 // ====================================================================
 // ELEMENTOS DEL DOM
 // ====================================================================
-const elements = {
-  // Pantalla de autenticación inicial
-  authScreen: document.getElementById('auth-screen'),
-  authForm: document.getElementById('auth-form'),
-  authUrl: document.getElementById('auth-url'),
-  authPassword: document.getElementById('auth-password'),
-  btnTogglePassword: document.getElementById('btn-toggle-password'),
-  authErrorMsg: document.getElementById('auth-error-msg'),
-  btnSubmitAuth: document.getElementById('btn-submit-auth'),
-  authBtnSpinner: document.getElementById('auth-btn-spinner'),
-  authBtnText: document.getElementById('auth-btn-text'),
+let elements = {};
 
-  // Interfaz de la aplicación principal
-  appContainer: document.getElementById('app-container'),
-  btnLogout: document.getElementById('btn-logout'),
-  cameraSelect: document.getElementById('camera-select'),
-  btnStart: document.getElementById('btn-start-scan'),
-  btnStop: document.getElementById('btn-stop-scan'),
-  scannerOverlay: document.getElementById('scanner-overlay'),
-  cameraPlaceholder: document.getElementById('camera-placeholder'),
-  readerContainer: document.getElementById('reader'),
-  statusBadge: document.getElementById('connection-status-badge'),
-  statusText: document.getElementById('connection-status-text'),
-  lastScanCard: document.getElementById('last-scan-card'),
-  lastScanData: document.getElementById('last-scan-data'),
-  lastScanTime: document.getElementById('last-scan-time'),
-  recordsTableBody: document.getElementById('records-table-body'),
-  emptyState: document.getElementById('empty-state'),
-  totalScansSpan: document.getElementById('total-scans'),
-  pendingScansSpan: document.getElementById('pending-scans'),
-  btnExportCsv: document.getElementById('btn-export-csv'),
-  btnClearHistory: document.getElementById('btn-clear-history'),
-  btnRetryPending: document.getElementById('btn-retry-pending'),
-  btnManualInput: document.getElementById('btn-manual-input'),
-  toastContainer: document.getElementById('toast-container'),
-  toggleAudio: document.getElementById('toggle-audio'),
-  cooldownSelect: document.getElementById('cooldown-select'),
-  manualModal: document.getElementById('manual-modal'),
-  btnCloseManual: document.getElementById('btn-close-manual'),
-  formManual: document.getElementById('form-manual'),
-  inputManualCode: document.getElementById('input-manual-code')
-};
+function inicializarReferenciasDOM() {
+  elements = {
+    // Pantalla de autenticación inicial
+    authScreen: document.getElementById('auth-screen'),
+    authForm: document.getElementById('auth-form'),
+    authUrl: document.getElementById('auth-url'),
+    authPassword: document.getElementById('auth-password'),
+    btnTogglePassword: document.getElementById('btn-toggle-password'),
+    authErrorMsg: document.getElementById('auth-error-msg'),
+    btnSubmitAuth: document.getElementById('btn-submit-auth'),
+    authBtnSpinner: document.getElementById('auth-btn-spinner'),
+    authBtnText: document.getElementById('auth-btn-text'),
+
+    // Interfaz de la aplicación principal
+    appContainer: document.getElementById('app-container'),
+    btnLogout: document.getElementById('btn-logout'),
+    cameraSelect: document.getElementById('camera-select'),
+    btnStart: document.getElementById('btn-start-scan'),
+    btnStop: document.getElementById('btn-stop-scan'),
+    scannerOverlay: document.getElementById('scanner-overlay'),
+    cameraPlaceholder: document.getElementById('camera-placeholder'),
+    readerContainer: document.getElementById('reader'),
+    statusBadge: document.getElementById('connection-status-badge'),
+    statusText: document.getElementById('connection-status-text'),
+    lastScanCard: document.getElementById('last-scan-card'),
+    lastScanData: document.getElementById('last-scan-data'),
+    lastScanTime: document.getElementById('last-scan-time'),
+    recordsTableBody: document.getElementById('records-table-body'),
+    emptyState: document.getElementById('empty-state'),
+    totalScansSpan: document.getElementById('total-scans'),
+    pendingScansSpan: document.getElementById('pending-scans'),
+    btnExportCsv: document.getElementById('btn-export-csv'),
+    btnClearHistory: document.getElementById('btn-clear-history'),
+    btnRetryPending: document.getElementById('btn-retry-pending'),
+    btnManualInput: document.getElementById('btn-manual-input'),
+    toastContainer: document.getElementById('toast-container'),
+    toggleAudio: document.getElementById('toggle-audio'),
+    cooldownSelect: document.getElementById('cooldown-select'),
+    manualModal: document.getElementById('manual-modal'),
+    btnCloseManual: document.getElementById('btn-close-manual'),
+    formManual: document.getElementById('form-manual'),
+    inputManualCode: document.getElementById('input-manual-code')
+  };
+}
 
 // ====================================================================
 // SONIDOS Y AUDIO CON WEB AUDIO API
@@ -94,9 +138,7 @@ function reproducirSonidoExito() {
 
     osc.start(audioCtx.currentTime);
     osc.stop(audioCtx.currentTime + 0.15);
-  } catch (e) {
-    console.warn('Audio no disponible:', e);
-  }
+  } catch (e) {}
 }
 
 function reproducirSonidoError() {
@@ -115,15 +157,14 @@ function reproducirSonidoError() {
 
     osc.start(audioCtx.currentTime);
     osc.stop(audioCtx.currentTime + 0.25);
-  } catch (e) {
-    console.warn('Audio no disponible:', e);
-  }
+  } catch (e) {}
 }
 
 // ====================================================================
 // NOTIFICACIONES FLOTANTES (TOAST)
 // ====================================================================
 function mostrarNotificacion(mensaje, tipo = 'info') {
+  if (!elements.toastContainer) return;
   const toast = document.createElement('div');
   toast.className = `toast toast-${tipo}`;
   toast.innerHTML = `<span>${mensaje}</span>`;
@@ -140,40 +181,50 @@ function mostrarNotificacion(mensaje, tipo = 'info') {
 // ====================================================================
 // INICIALIZACIÓN DE LA APLICACIÓN
 // ====================================================================
-document.addEventListener('DOMContentLoaded', () => {
-  // Escuchadores de eventos
-  asignarEventos();
+function iniciarAplicacion() {
+  try {
+    inicializarReferenciasDOM();
+    asignarEventos();
 
-  // Verificar si ya cuenta con sesión autenticada
-  if (AppState.isAuthenticated && AppState.googleSheetUrl && AppState.password) {
-    activarInterfazPrincipal();
-  } else {
-    activarPantallaLogin();
+    // Comprobar si ya cuenta con sesión verificada
+    if (AppState.isAuthenticated && AppState.googleSheetUrl && AppState.password) {
+      activarInterfazPrincipal();
+    } else {
+      activarPantallaLogin();
+    }
+  } catch (err) {
+    console.error('Error durante la inicialización:', err);
+    // Asegurar que la pantalla de login siempre sea visible en caso de error
+    const auth = document.getElementById('auth-screen');
+    if (auth) auth.style.display = 'flex';
   }
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', iniciarAplicacion);
+} else {
+  iniciarAplicacion();
+}
 
 function activarPantallaLogin() {
-  elements.appContainer.style.display = 'none';
-  elements.authScreen.style.display = 'flex';
+  if (elements.appContainer) elements.appContainer.style.display = 'none';
+  if (elements.authScreen) elements.authScreen.style.display = 'flex';
   
-  if (AppState.googleSheetUrl) {
+  if (elements.authUrl && AppState.googleSheetUrl) {
     elements.authUrl.value = AppState.googleSheetUrl;
   }
-  elements.authPassword.value = '';
-  elements.authErrorMsg.style.display = 'none';
+  if (elements.authPassword) elements.authPassword.value = '';
+  if (elements.authErrorMsg) elements.authErrorMsg.style.display = 'none';
 }
 
 function activarInterfazPrincipal() {
-  elements.authScreen.style.display = 'none';
-  elements.appContainer.style.display = 'flex';
+  if (elements.authScreen) elements.authScreen.style.display = 'none';
+  if (elements.appContainer) elements.appContainer.style.display = 'flex';
 
-  elements.toggleAudio.checked = AppState.audioEnabled;
-  elements.cooldownSelect.value = AppState.cooldownSeconds.toString();
+  if (elements.toggleAudio) elements.toggleAudio.checked = AppState.audioEnabled;
+  if (elements.cooldownSelect) elements.cooldownSelect.value = AppState.cooldownSeconds.toString();
 
-  // Renderizar historial previo
   renderizarHistorial();
-
-  // Inicializar cámaras
   inicializarCamaras();
 }
 
@@ -181,12 +232,11 @@ function activarInterfazPrincipal() {
 // AUTENTICACIÓN Y VALIDACIÓN CON GOOGLE SHEETS
 // ====================================================================
 async function procesarLogin(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
 
-  const urlIngresada = elements.authUrl.value.trim();
-  const passIngresada = elements.authPassword.value.trim();
+  const urlIngresada = (elements.authUrl ? elements.authUrl.value : '').trim();
+  const passIngresada = (elements.authPassword ? elements.authPassword.value : '').trim();
 
-  // 1. Validaciones locales de formato
   if (!urlIngresada.startsWith('https://script.google.com/macros/s/')) {
     mostrarErrorAuth('La URL debe comenzar con: https://script.google.com/macros/s/...');
     return;
@@ -202,13 +252,10 @@ async function procesarLogin(e) {
     return;
   }
 
-  // Activar estado de carga
   setAuthLoading(true);
   ocultarErrorAuth();
 
   try {
-    // 2. Probar conexión y validar contraseña con Google Sheets
-    // Se utiliza el endpoint GET con la acción de verificación
     const endpointPrueba = `${urlIngresada}?accion=verificar&pass=${encodeURIComponent(passIngresada)}&_t=${Date.now()}`;
     
     const respuesta = await fetch(endpointPrueba, {
@@ -223,20 +270,18 @@ async function procesarLogin(e) {
     const resultado = await respuesta.json();
 
     if (resultado.authorized === true || resultado.status === 'success') {
-      // ✅ Contraseña correcta y hoja vinculada
       AppState.googleSheetUrl = urlIngresada;
       AppState.password = passIngresada;
       AppState.isAuthenticated = true;
 
-      localStorage.setItem('qr_sheets_url', urlIngresada);
-      localStorage.setItem('qr_sheets_password', passIngresada);
-      localStorage.setItem('qr_auth_verified', 'true');
+      safeStorage.set('qr_sheets_url', urlIngresada);
+      safeStorage.set('qr_sheets_password', passIngresada);
+      safeStorage.set('qr_auth_verified', 'true');
 
       reproducirSonidoExito();
       mostrarNotificacion('✅ Vinculado con éxito a Google Sheets', 'success');
       activarInterfazPrincipal();
     } else {
-      // ❌ Contraseña incorrecta
       reproducirSonidoError();
       mostrarErrorAuth(resultado.message || 'Contraseña incorrecta. Revisa la celda A1 de la pestaña "PASSWORD".');
     }
@@ -253,25 +298,27 @@ async function procesarLogin(e) {
 }
 
 function setAuthLoading(cargando) {
+  if (!elements.btnSubmitAuth) return;
   if (cargando) {
     elements.btnSubmitAuth.disabled = true;
-    elements.authBtnSpinner.style.display = 'inline-block';
-    elements.authBtnText.textContent = ' Verificando credenciales...';
+    if (elements.authBtnSpinner) elements.authBtnSpinner.style.display = 'inline-block';
+    if (elements.authBtnText) elements.authBtnText.textContent = ' Verificando credenciales...';
   } else {
     elements.btnSubmitAuth.disabled = false;
-    elements.authBtnSpinner.style.display = 'none';
-    elements.authBtnText.textContent = '🔐 Conectar y Desbloquear';
+    if (elements.authBtnSpinner) elements.authBtnSpinner.style.display = 'none';
+    if (elements.authBtnText) elements.authBtnText.textContent = '🔐 Conectar y Desbloquear';
   }
 }
 
 function mostrarErrorAuth(mensaje) {
+  if (!elements.authErrorMsg) return;
   elements.authErrorMsg.className = 'auth-alert error';
   elements.authErrorMsg.innerHTML = `⚠️ <strong>Error:</strong> ${escapeHtml(mensaje)}`;
   elements.authErrorMsg.style.display = 'block';
 }
 
 function ocultarErrorAuth() {
-  elements.authErrorMsg.style.display = 'none';
+  if (elements.authErrorMsg) elements.authErrorMsg.style.display = 'none';
 }
 
 function cerrarSesion() {
@@ -279,10 +326,10 @@ function cerrarSesion() {
     detenerEscaneo();
     AppState.isAuthenticated = false;
     AppState.password = '';
-    localStorage.removeItem('qr_auth_verified');
-    localStorage.removeItem('qr_sheets_password');
+    safeStorage.remove('qr_auth_verified');
+    safeStorage.remove('qr_sheets_password');
     activarPantallaLogin();
-    mostrarNotificacion('Sesión cerrada. Debes ingresar tus credenciales para volver a entrar.', 'info');
+    mostrarNotificacion('Sesión cerrada. Ingresa tus credenciales para volver a entrar.', 'info');
   }
 }
 
@@ -290,6 +337,7 @@ function cerrarSesion() {
 // CONTROL DE CÁMARAS Y ESCÁNER QR
 // ====================================================================
 async function inicializarCamaras() {
+  if (!elements.cameraSelect) return;
   try {
     if (typeof Html5Qrcode !== 'undefined') {
       const devices = await Html5Qrcode.getCameras();
@@ -304,7 +352,6 @@ async function inicializarCamaras() {
         });
         AppState.selectedCameraId = devices[0].id;
         
-        // Priorizar cámara trasera en celulares
         const backCamera = devices.find(d => 
           d.label.toLowerCase().includes('back') || 
           d.label.toLowerCase().includes('trasera') ||
@@ -318,12 +365,13 @@ async function inicializarCamaras() {
         elements.cameraSelect.innerHTML = '<option value="">No se detectaron cámaras</option>';
       }
     } else {
-      console.warn('Librería externa no cargada. Activando motor nativo.');
       await inicializarCamarasNativas();
     }
   } catch (err) {
     console.error('Error al obtener cámaras:', err);
-    elements.cameraSelect.innerHTML = '<option value="">Permiso de cámara no concedido</option>';
+    if (elements.cameraSelect) {
+      elements.cameraSelect.innerHTML = '<option value="">Permiso de cámara pendiente</option>';
+    }
   }
 }
 
@@ -332,6 +380,7 @@ async function inicializarCamarasNativas() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videoDevices = devices.filter(d => d.kind === 'videoinput');
+    if (!elements.cameraSelect) return;
     elements.cameraSelect.innerHTML = '';
     
     videoDevices.forEach((device, index) => {
@@ -352,7 +401,7 @@ async function inicializarCamarasNativas() {
 async function iniciarEscaneo() {
   if (AppState.isScanning) return;
 
-  const cameraId = elements.cameraSelect.value || AppState.selectedCameraId;
+  const cameraId = elements.cameraSelect ? elements.cameraSelect.value || AppState.selectedCameraId : AppState.selectedCameraId;
 
   if (typeof Html5Qrcode !== 'undefined') {
     try {
@@ -360,8 +409,8 @@ async function iniciarEscaneo() {
         AppState.html5QrCode = new Html5Qrcode('reader');
       }
 
-      elements.cameraPlaceholder.style.display = 'none';
-      elements.scannerOverlay.classList.add('active');
+      if (elements.cameraPlaceholder) elements.cameraPlaceholder.style.display = 'none';
+      if (elements.scannerOverlay) elements.scannerOverlay.classList.add('active');
 
       const config = {
         fps: 15,
@@ -384,7 +433,7 @@ async function iniciarEscaneo() {
       actualizarBotonesEscaneo(true);
       mostrarNotificacion('Cámara activada. Listo para leer QR.', 'info');
     } catch (err) {
-      console.error('Error al iniciar con Html5Qrcode:', err);
+      console.error('Error con Html5Qrcode:', err);
       iniciarEscaneoNativo();
     }
   } else {
@@ -410,16 +459,16 @@ async function detenerEscaneo() {
     console.warn('Error al detener escáner:', err);
   } finally {
     AppState.isScanning = false;
-    elements.scannerOverlay.classList.remove('active');
-    elements.cameraPlaceholder.style.display = 'block';
+    if (elements.scannerOverlay) elements.scannerOverlay.classList.remove('active');
+    if (elements.cameraPlaceholder) elements.cameraPlaceholder.style.display = 'block';
     actualizarBotonesEscaneo(false);
   }
 }
 
 async function iniciarEscaneoNativo() {
   try {
-    elements.cameraPlaceholder.style.display = 'none';
-    elements.scannerOverlay.classList.add('active');
+    if (elements.cameraPlaceholder) elements.cameraPlaceholder.style.display = 'none';
+    if (elements.scannerOverlay) elements.scannerOverlay.classList.add('active');
 
     const constraints = {
       video: AppState.selectedCameraId ? { deviceId: { exact: AppState.selectedCameraId } } : { facingMode: 'environment' }
@@ -428,8 +477,8 @@ async function iniciarEscaneoNativo() {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     AppState.nativeVideoTrack = stream.getVideoTracks()[0];
 
-    let video = elements.readerContainer.querySelector('video');
-    if (!video) {
+    let video = elements.readerContainer ? elements.readerContainer.querySelector('video') : null;
+    if (!video && elements.readerContainer) {
       video = document.createElement('video');
       video.setAttribute('playsinline', 'true');
       video.setAttribute('autoplay', 'true');
@@ -438,8 +487,10 @@ async function iniciarEscaneoNativo() {
       video.style.objectFit = 'cover';
       elements.readerContainer.appendChild(video);
     }
-    video.srcObject = stream;
-    await video.play();
+    if (video) {
+      video.srcObject = stream;
+      await video.play();
+    }
 
     AppState.isScanning = true;
     AppState.nativeDetectorActive = true;
@@ -464,20 +515,22 @@ async function iniciarEscaneoNativo() {
   } catch (e) {
     console.error('Error con escáner nativo:', e);
     mostrarNotificacion('No se pudo acceder a la cámara. Permiso denegado.', 'error');
-    elements.cameraPlaceholder.style.display = 'block';
-    elements.scannerOverlay.classList.remove('active');
+    if (elements.cameraPlaceholder) elements.cameraPlaceholder.style.display = 'block';
+    if (elements.scannerOverlay) elements.scannerOverlay.classList.remove('active');
   }
 }
 
 function actualizarBotonesEscaneo(escaneando) {
-  if (escaneando) {
-    elements.btnStart.style.display = 'none';
-    elements.btnStop.style.display = 'inline-flex';
-    elements.cameraSelect.disabled = true;
-  } else {
-    elements.btnStart.style.display = 'inline-flex';
-    elements.btnStop.style.display = 'none';
-    elements.cameraSelect.disabled = false;
+  if (elements.btnStart && elements.btnStop) {
+    if (escaneando) {
+      elements.btnStart.style.display = 'none';
+      elements.btnStop.style.display = 'inline-flex';
+      if (elements.cameraSelect) elements.cameraSelect.disabled = true;
+    } else {
+      elements.btnStart.style.display = 'inline-flex';
+      elements.btnStop.style.display = 'none';
+      if (elements.cameraSelect) elements.cameraSelect.disabled = false;
+    }
   }
 }
 
@@ -492,7 +545,6 @@ function procesarCodigoDetectado(textoQr) {
   const ahora = Date.now();
   const tiempoTranscurrido = (ahora - AppState.lastScannedTime) / 1000;
 
-  // Enfriamiento anti-duplicados
   if (textoLimpio === AppState.lastScannedText && tiempoTranscurrido < AppState.cooldownSeconds) {
     return;
   }
@@ -507,24 +559,20 @@ function procesarCodigoDetectado(textoQr) {
 async function registrarLectura(datoQr) {
   const fechaObj = new Date();
   
-  // Formato: DD/MM/AAAA
   const dia = String(fechaObj.getDate()).padStart(2, '0');
   const mes = String(fechaObj.getMonth() + 1).padStart(2, '0');
   const anio = fechaObj.getFullYear();
   const fechaStr = `${dia}/${mes}/${anio}`;
 
-  // Formato: HH:MM:SS
   const horas = String(fechaObj.getHours()).padStart(2, '0');
   const minutos = String(fechaObj.getMinutes()).padStart(2, '0');
   const segundos = String(fechaObj.getSeconds()).padStart(2, '0');
   const horaStr = `${horas}:${minutos}:${segundos}`;
 
-  // Mostrar último escaneo
-  elements.lastScanCard.style.display = 'block';
-  elements.lastScanData.textContent = datoQr;
-  elements.lastScanTime.textContent = `${fechaStr} a las ${horaStr}`;
+  if (elements.lastScanCard) elements.lastScanCard.style.display = 'block';
+  if (elements.lastScanData) elements.lastScanData.textContent = datoQr;
+  if (elements.lastScanTime) elements.lastScanTime.textContent = `${fechaStr} a las ${horaStr}`;
 
-  // Objeto de registro
   const nuevoRegistro = {
     id: Date.now() + '-' + Math.random().toString(36).substr(2, 5),
     fecha: fechaStr,
@@ -551,7 +599,7 @@ async function enviarAGoogleSheets(registro) {
 
   const payload = {
     accion: 'registrar',
-    pass: AppState.password, // Se envía la contraseña para validar la escritura
+    pass: AppState.password,
     fecha: registro.fecha,
     hora: registro.hora,
     datoQr: registro.datoQr,
@@ -567,7 +615,7 @@ async function enviarAGoogleSheets(registro) {
     });
 
     registro.estado = 'enviado';
-    mostrarNotificacion(`✅ QR guardado en Sheets: ${registro.datoQr.substring(0, 20)}...`, 'success');
+    mostrarNotificacion(`✅ Guardado: ${registro.datoQr.substring(0, 18)}...`, 'success');
   } catch (error) {
     console.error('Error al enviar a Google Sheets:', error);
     registro.estado = 'error';
@@ -596,25 +644,26 @@ async function reintentarPendientes() {
 // HISTORIAL LOCAL Y CSV
 // ====================================================================
 function guardarHistorialLocal() {
-  localStorage.setItem('qr_history', JSON.stringify(AppState.history));
+  safeStorage.set('qr_history', JSON.stringify(AppState.history));
 }
 
 function renderizarHistorial() {
+  if (!elements.recordsTableBody) return;
   const tbody = elements.recordsTableBody;
   tbody.innerHTML = '';
 
   const total = AppState.history.length;
   const pendientes = AppState.history.filter(r => r.estado !== 'enviado').length;
 
-  elements.totalScansSpan.textContent = total;
-  elements.pendingScansSpan.textContent = pendientes;
+  if (elements.totalScansSpan) elements.totalScansSpan.textContent = total;
+  if (elements.pendingScansSpan) elements.pendingScansSpan.textContent = pendientes;
 
   if (total === 0) {
-    elements.emptyState.style.display = 'block';
+    if (elements.emptyState) elements.emptyState.style.display = 'block';
     return;
   }
 
-  elements.emptyState.style.display = 'none';
+  if (elements.emptyState) elements.emptyState.style.display = 'none';
 
   AppState.history.forEach((reg, index) => {
     const tr = document.createElement('tr');
@@ -650,7 +699,7 @@ window.eliminarRegistro = function(id) {
   AppState.history = AppState.history.filter(r => r.id !== id);
   guardarHistorialLocal();
   renderizarHistorial();
-  mostrarNotificacion('Registro eliminado del historial local', 'info');
+  mostrarNotificacion('Registro eliminado', 'info');
 };
 
 function limpiarHistorial() {
@@ -659,7 +708,7 @@ function limpiarHistorial() {
     AppState.history = [];
     guardarHistorialLocal();
     renderizarHistorial();
-    elements.lastScanCard.style.display = 'none';
+    if (elements.lastScanCard) elements.lastScanCard.style.display = 'none';
     mostrarNotificacion('Historial local vaciado', 'info');
   }
 }
@@ -693,71 +742,81 @@ function exportarACsv() {
 // ASIGNACIÓN DE EVENTOS
 // ====================================================================
 function asignarEventos() {
-  // Autenticación
-  elements.authForm.addEventListener('submit', procesarLogin);
-  elements.btnLogout.addEventListener('click', cerrarSesion);
+  if (elements.authForm) elements.authForm.addEventListener('submit', procesarLogin);
+  if (elements.btnLogout) elements.btnLogout.addEventListener('click', cerrarSesion);
 
-  // Mostrar / Ocultar contraseña
-  elements.btnTogglePassword.addEventListener('click', () => {
-    const tipoActual = elements.authPassword.getAttribute('type');
-    if (tipoActual === 'password') {
-      elements.authPassword.setAttribute('type', 'text');
-      elements.btnTogglePassword.textContent = '🙈';
-    } else {
-      elements.authPassword.setAttribute('type', 'password');
-      elements.btnTogglePassword.textContent = '👁️';
-    }
-  });
+  if (elements.btnTogglePassword && elements.authPassword) {
+    elements.btnTogglePassword.addEventListener('click', () => {
+      const tipoActual = elements.authPassword.getAttribute('type');
+      if (tipoActual === 'password') {
+        elements.authPassword.setAttribute('type', 'text');
+        elements.btnTogglePassword.textContent = '🙈';
+      } else {
+        elements.authPassword.setAttribute('type', 'password');
+        elements.btnTogglePassword.textContent = '👁️';
+      }
+    });
+  }
 
-  // Controles de cámara
-  elements.btnStart.addEventListener('click', iniciarEscaneo);
-  elements.btnStop.addEventListener('click', detenerEscaneo);
-  elements.cameraSelect.addEventListener('change', () => {
-    AppState.selectedCameraId = elements.cameraSelect.value;
-    if (AppState.isScanning) {
-      detenerEscaneo().then(() => iniciarEscaneo());
-    }
-  });
+  if (elements.btnStart) elements.btnStart.addEventListener('click', iniciarEscaneo);
+  if (elements.btnStop) elements.btnStop.addEventListener('click', detenerEscaneo);
 
-  // Opciones de audio y enfriamiento
-  elements.toggleAudio.addEventListener('change', (e) => {
-    AppState.audioEnabled = e.target.checked;
-    localStorage.setItem('qr_audio_enabled', AppState.audioEnabled);
-  });
+  if (elements.cameraSelect) {
+    elements.cameraSelect.addEventListener('change', () => {
+      AppState.selectedCameraId = elements.cameraSelect.value;
+      if (AppState.isScanning) {
+        detenerEscaneo().then(() => iniciarEscaneo());
+      }
+    });
+  }
 
-  elements.cooldownSelect.addEventListener('change', (e) => {
-    AppState.cooldownSeconds = parseInt(e.target.value, 10);
-    localStorage.setItem('qr_cooldown', AppState.cooldownSeconds);
-  });
+  if (elements.toggleAudio) {
+    elements.toggleAudio.addEventListener('change', (e) => {
+      AppState.audioEnabled = e.target.checked;
+      safeStorage.set('qr_audio_enabled', AppState.audioEnabled ? 'true' : 'false');
+    });
+  }
 
-  // Acciones de tabla
-  elements.btnExportCsv.addEventListener('click', exportarACsv);
-  elements.btnClearHistory.addEventListener('click', limpiarHistorial);
-  elements.btnRetryPending.addEventListener('click', reintentarPendientes);
+  if (elements.cooldownSelect) {
+    elements.cooldownSelect.addEventListener('change', (e) => {
+      AppState.cooldownSeconds = parseInt(e.target.value, 10);
+      safeStorage.set('qr_cooldown', AppState.cooldownSeconds.toString());
+    });
+  }
 
-  // Entrada manual
-  elements.btnManualInput.addEventListener('click', () => {
-    elements.manualModal.classList.add('open');
-    elements.inputManualCode.focus();
-  });
-  elements.btnCloseManual.addEventListener('click', () => {
-    elements.manualModal.classList.remove('open');
-    elements.inputManualCode.value = '';
-  });
-  elements.formManual.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const codigo = elements.inputManualCode.value.trim();
-    if (codigo) {
-      elements.manualModal.classList.remove('open');
-      elements.inputManualCode.value = '';
-      reproducirSonidoExito();
-      registrarLectura(codigo);
-    }
-  });
+  if (elements.btnExportCsv) elements.btnExportCsv.addEventListener('click', exportarACsv);
+  if (elements.btnClearHistory) elements.btnClearHistory.addEventListener('click', limpiarHistorial);
+  if (elements.btnRetryPending) elements.btnRetryPending.addEventListener('click', reintentarPendientes);
 
-  // Cerrar modal haciendo clic afuera
+  if (elements.btnManualInput) {
+    elements.btnManualInput.addEventListener('click', () => {
+      if (elements.manualModal) elements.manualModal.classList.add('open');
+      if (elements.inputManualCode) elements.inputManualCode.focus();
+    });
+  }
+
+  if (elements.btnCloseManual) {
+    elements.btnCloseManual.addEventListener('click', () => {
+      if (elements.manualModal) elements.manualModal.classList.remove('open');
+      if (elements.inputManualCode) elements.inputManualCode.value = '';
+    });
+  }
+
+  if (elements.formManual) {
+    elements.formManual.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const codigo = elements.inputManualCode ? elements.inputManualCode.value.trim() : '';
+      if (codigo) {
+        if (elements.manualModal) elements.manualModal.classList.remove('open');
+        if (elements.inputManualCode) elements.inputManualCode.value = '';
+        reproducirSonidoExito();
+        registrarLectura(codigo);
+      }
+    });
+  }
+
   window.addEventListener('click', (e) => {
-    if (e.target === elements.manualModal) {
+    if (elements.manualModal && e.target === elements.manualModal) {
       elements.manualModal.classList.remove('open');
     }
   });
