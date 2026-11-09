@@ -207,8 +207,9 @@ if (document.readyState === 'loading') {
 }
 
 function activarPantallaLogin() {
-  if (elements.appContainer) elements.appContainer.style.display = 'none';
-  if (elements.authScreen) elements.authScreen.style.display = 'flex';
+  if (elements.authScreen) {
+    elements.authScreen.style.display = 'flex';
+  }
   
   if (elements.authUrl && AppState.googleSheetUrl) {
     elements.authUrl.value = AppState.googleSheetUrl;
@@ -218,8 +219,12 @@ function activarPantallaLogin() {
 }
 
 function activarInterfazPrincipal() {
-  if (elements.authScreen) elements.authScreen.style.display = 'none';
-  if (elements.appContainer) elements.appContainer.style.display = 'flex';
+  if (elements.authScreen) {
+    elements.authScreen.style.display = 'none';
+  }
+
+  // Asegurar que la pantalla quede en la parte superior sin espacios vacíos
+  window.scrollTo(0, 0);
 
   if (elements.toggleAudio) elements.toggleAudio.checked = AppState.audioEnabled;
   if (elements.cooldownSelect) elements.cooldownSelect.value = AppState.cooldownSeconds.toString();
